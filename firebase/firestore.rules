@@ -1,0 +1,202 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // Helper Functions
+    // ============================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isPartner(userId) {
+      let userData = getUserData();
+      return userData.partnerId == userId && userData.partnerStatus == 'active';
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'displayName', 'points', 'level']) &&
+             data.email is string &&
+             data.displayName is string &&
+             data.points is number &&
+             data.level is number;
+    }
+
+    function isValidResolution(data) {
+      return data.keys().hasAll(['title', 'themeId', 'deadlineType', 'isActive']) &&
+             data.title is string &&
+             data.title.size() > 0 &&
+             data.themeId in ['health', 'finance', 'career', 'personal',
+                              'relationships', 'education', 'creativity', 'mindfulness'] &&
+             data.deadlineType in ['daily', 'weekly', 'monthly', 'quarterly', 'custom'];
+    }
+
+    // ============================================
+    // Users Collection
+    // ============================================
+
+    match /users/{userId} {
+      // Read: own document or partner's document (if active partnership)
+      allow read: if isAuthenticated() && (isOwner(userId) || isPartner(userId));
+
+      // Create: only during registration, must be own document
+      allow create: if isAuthenticated() &&
+                       isOwner(userId) &&
+                       isValidUser(request.resource.data);
+
+      // Update: only own document
+      allow update: if isAuthenticated() && isOwner(userId);
+
+      // Delete: not allowed (use soft delete via isActive flag)
+      allow delete: if false;
+
+      // ----------------------------------------
+      // Resolutions Subcollection
+      // ----------------------------------------
+      match /resolutions/{resolutionId} {
+        // Read: owner always, partner only if sharedWithPartner is true
+        allow read: if isAuthenticated() && (
+          isOwner(userId) ||
+          (isPartner(userId) && resource.data.sharedWithPartner == true)
+        );
+
+        // Create: only owner, must be valid resolution
+        allow create: if isAuthenticated() &&
+                         isOwner(userId) &&
+                         isValidResolution(request.resource.data);
+
+        // Update: only owner
+        allow update: if isAuthenticated() && isOwner(userId);
+
+        // Delete: only owner
+        allow delete: if isAuthenticated() && isOwner(userId);
+
+        // ----------------------------------------
+        // Completions Subcollection
+        // ----------------------------------------
+        match /completions/{completionId} {
+          // Read: owner or partner
+          allow read: if isAuthenticated() && (isOwner(userId) || isPartner(userId));
+
+          // Write: only owner
+          allow create, update, delete: if isAuthenticated() && isOwner(userId);
+        }
+      }
+
+      // ----------------------------------------
+      // User Badges Subcollection
+      // ----------------------------------------
+      match /badges/{badgeId} {
+        // Read: owner or partner
+        allow read: if isAuthenticated() && (isOwner(userId) || isPartner(userId));
+
+        // Write: only owner (system awards badges via client)
+        allow create, update: if isAuthenticated() && isOwner(userId);
+
+        // Delete: not allowed
+        allow delete: if false;
+      }
+
+      // ----------------------------------------
+      // Streak History Subcollection
+      // ----------------------------------------
+      match /streakHistory/{entryId} {
+        // Read: only owner (streak history is private)
+        allow read: if isAuthenticated() && isOwner(userId);
+
+        // Write: only owner
+        allow create, update: if isAuthenticated() && isOwner(userId);
+
+        // Delete: only owner
+        allow delete: if isAuthenticated() && isOwner(userId);
+      }
+    }
+
+    // ============================================
+    // Partner Invites Collection
+    // ============================================
+
+    match /partnerInvites/{inviteId} {
+      // Read: sender, recipient by ID, or recipient by email
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid ||
+        resource.data.recipientEmail == request.auth.token.email
+      );
+
+      // Create: any authenticated user can send invite
+      allow create: if isAuthenticated() &&
+                       request.resource.data.senderId == request.auth.uid &&
+                       request.resource.data.status == 'pending';
+
+      // Update: recipient can accept/decline, sender can cancel
+      allow update: if isAuthenticated() && (
+        // Recipient accepting/declining
+        (resource.data.recipientId == request.auth.uid ||
+         resource.data.recipientEmail == request.auth.token.email) &&
+        request.resource.data.status in ['accepted', 'declined']
+      ) || (
+        // Sender canceling
+        resource.data.senderId == request.auth.uid &&
+        request.resource.data.status == 'expired'
+      );
+
+      // Delete: sender can delete pending invites
+      allow delete: if isAuthenticated() &&
+                       resource.data.senderId == request.auth.uid &&
+                       resource.data.status == 'pending';
+    }
+
+    // ============================================
+    // Partner Challenges Collection
+    // ============================================
+
+    match /partnerChallenges/{challengeId} {
+      // Read: only participants
+      allow read: if isAuthenticated() &&
+                     request.auth.uid in resource.data.participants.keys();
+
+      // Create: authenticated users who are in participants
+      allow create: if isAuthenticated() &&
+                       request.auth.uid in request.resource.data.participants.keys();
+
+      // Update: only participants can update their scores
+      allow update: if isAuthenticated() &&
+                       request.auth.uid in resource.data.participants.keys();
+
+      // Delete: not allowed (challenges are archived, not deleted)
+      allow delete: if false;
+    }
+
+    // ============================================
+    // Read-only Collections (seeded by admin)
+    // ============================================
+
+    // Global themes collection
+    match /themes/{themeId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin only via Firebase Console
+    }
+
+    // Global badges collection
+    match /badges/{badgeId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin only via Firebase Console
+    }
+
+    // App configuration
+    match /config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin only via Firebase Console
+    }
+  }
+}
