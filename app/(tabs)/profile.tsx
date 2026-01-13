@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  RefreshControl,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useBadges, BadgeWithStatus } from '../../src/hooks/useBadges';
 import { Card } from '../../src/components/common';
 import { colors, typography, spacing, borderRadius } from '../../src/theme';
 import {
@@ -18,8 +20,40 @@ import {
   BADGES,
 } from '../../src/config/gamification';
 
+// Badge icon mapping (Ionicons doesn't have all icons, so map to available ones)
+const BADGE_ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
+  flame: 'flame',
+  check: 'checkmark',
+  'check-circle': 'checkmark-circle',
+  trophy: 'trophy',
+  award: 'ribbon',
+  star: 'star',
+  coins: 'cash',
+  gem: 'diamond',
+  crown: 'ribbon',
+  users: 'people',
+  medal: 'medal',
+  heart: 'heart',
+  'dollar-sign': 'cash',
+  briefcase: 'briefcase',
+  sun: 'sunny',
+};
+
+const getBadgeIcon = (iconName: string): keyof typeof Ionicons.glyphMap => {
+  return BADGE_ICON_MAP[iconName] || 'ribbon';
+};
+
+const RARITY_COLORS: Record<string, string> = {
+  common: colors.neutral[400],
+  rare: colors.primary[500],
+  epic: colors.secondary[500],
+  legendary: '#FFD700',
+};
+
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
+  const { allBadgesWithStatus, earnedCount, totalCount } = useBadges();
+  const [refreshing, setRefreshing] = useState(false);
 
   const points = user?.points || 0;
   const levelInfo = getLevelFromPoints(points);
@@ -27,6 +61,12 @@ export default function ProfileScreen() {
   const totalCompletions = user?.totalCompletions || 0;
   const currentStreak = user?.currentStreak || 0;
   const longestStreak = user?.longestStreak || 0;
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshUser();
+    setTimeout(() => setRefreshing(false), 1000);
+  }, [refreshUser]);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -39,11 +79,17 @@ export default function ProfileScreen() {
     ]);
   };
 
+  // Get first 6 badges to display (prioritize earned ones)
+  const displayBadges = allBadgesWithStatus.slice(0, 6);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Profile Header */}
         <View style={styles.header}>
@@ -107,16 +153,34 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Badges</Text>
-            <Text style={styles.sectionCount}>0 / {BADGES.length}</Text>
+            <Text style={styles.sectionCount}>{earnedCount} / {totalCount}</Text>
           </View>
           <Card style={styles.badgesCard}>
             <View style={styles.badgesGrid}>
-              {BADGES.slice(0, 6).map((badge) => (
+              {displayBadges.map((badge) => (
                 <View key={badge.id} style={styles.badgeItem}>
-                  <View style={[styles.badgeLocked]}>
-                    <Ionicons name="lock-closed" size={20} color={colors.neutral[300]} />
-                  </View>
-                  <Text style={styles.badgeName} numberOfLines={1}>
+                  {badge.earned ? (
+                    <View
+                      style={[
+                        styles.badgeEarned,
+                        { backgroundColor: RARITY_COLORS[badge.rarity] + '20' },
+                      ]}
+                    >
+                      <Ionicons
+                        name={getBadgeIcon(badge.icon)}
+                        size={24}
+                        color={RARITY_COLORS[badge.rarity]}
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.badgeLocked}>
+                      <Ionicons name="lock-closed" size={20} color={colors.neutral[300]} />
+                    </View>
+                  )}
+                  <Text
+                    style={[styles.badgeName, badge.earned && styles.badgeNameEarned]}
+                    numberOfLines={1}
+                  >
                     {badge.name}
                   </Text>
                 </View>
@@ -320,10 +384,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing[1],
   },
+  badgeEarned: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[1],
+  },
   badgeName: {
     ...typography.styles.caption,
     color: colors.text.tertiary,
     textAlign: 'center',
+  },
+  badgeNameEarned: {
+    color: colors.text.primary,
+    fontWeight: '500',
   },
   viewAllButton: {
     flexDirection: 'row',
