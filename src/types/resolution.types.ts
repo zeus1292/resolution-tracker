@@ -6,11 +6,9 @@ export type ThemeId =
   | 'health'
   | 'finance'
   | 'career'
-  | 'personal'
-  | 'relationships'
-  | 'education'
+  | 'learning'
   | 'creativity'
-  | 'mindfulness';
+  | 'travel';
 
 export interface Resolution {
   id: string;

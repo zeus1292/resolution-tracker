@@ -12,31 +12,25 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useBadges, BadgeWithStatus } from '../../src/hooks/useBadges';
-import { Card } from '../../src/components/common';
-import { colors, typography, spacing, borderRadius } from '../../src/theme';
+import { Card, Button } from '../../src/components/common';
+import { colors, typography, spacing } from '../../src/theme';
 import {
-  getLevelFromPoints,
-  getProgressToNextLevel,
   BADGES,
+  STREAK_PROTECTION_COST,
+  canAffordStreakProtection,
+  getNextStreakMilestone,
 } from '../../src/config/gamification';
 
-// Badge icon mapping (Ionicons doesn't have all icons, so map to available ones)
+// Badge icon mapping
 const BADGE_ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
   flame: 'flame',
-  check: 'checkmark',
-  'check-circle': 'checkmark-circle',
   trophy: 'trophy',
-  award: 'ribbon',
+  'checkmark-circle': 'checkmark-circle',
+  ribbon: 'ribbon',
   star: 'star',
-  coins: 'cash',
-  gem: 'diamond',
-  crown: 'ribbon',
-  users: 'people',
+  people: 'people',
   medal: 'medal',
-  heart: 'heart',
-  'dollar-sign': 'cash',
-  briefcase: 'briefcase',
-  sun: 'sunny',
+  shield: 'shield-checkmark',
 };
 
 const getBadgeIcon = (iconName: string): keyof typeof Ionicons.glyphMap => {
@@ -56,17 +50,42 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const points = user?.points || 0;
-  const levelInfo = getLevelFromPoints(points);
-  const progress = getProgressToNextLevel(points);
   const totalCompletions = user?.totalCompletions || 0;
   const currentStreak = user?.currentStreak || 0;
   const longestStreak = user?.longestStreak || 0;
+  const nextMilestone = getNextStreakMilestone(currentStreak);
+  const canProtect = canAffordStreakProtection(points);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refreshUser();
     setTimeout(() => setRefreshing(false), 1000);
   }, [refreshUser]);
+
+  const handleStreakProtection = () => {
+    if (!canProtect) {
+      Alert.alert(
+        'Not Enough Points',
+        `You need ${STREAK_PROTECTION_COST} points to protect your streak. You have ${points} points.`
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Protect Streak',
+      `Spend ${STREAK_PROTECTION_COST} points to protect your streak for one missed day?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Protect',
+          onPress: () => {
+            // TODO: Implement streak protection
+            Alert.alert('Coming Soon', 'Streak protection will be available in the next update!');
+          },
+        },
+      ]
+    );
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -93,41 +112,57 @@ export default function ProfileScreen() {
       >
         {/* Profile Header */}
         <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color={colors.neutral[400]} />
-            </View>
-            <View
-              style={[styles.levelBadge, { backgroundColor: levelInfo.color }]}
-            >
-              <Text style={styles.levelBadgeText}>{levelInfo.level}</Text>
-            </View>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={40} color={colors.neutral[400]} />
           </View>
           <Text style={styles.displayName}>{user?.displayName || 'User'}</Text>
-          <Text style={styles.levelTitle}>{levelInfo.title}</Text>
+          <Text style={styles.email}>{user?.email || ''}</Text>
         </View>
 
-        {/* Points & Level Progress */}
-        <Card style={styles.progressCard}>
+        {/* Points Card */}
+        <Card style={styles.pointsCard}>
           <View style={styles.pointsRow}>
             <View style={styles.pointsInfo}>
+              <Ionicons name="star" size={28} color={colors.warning[500]} />
               <Text style={styles.pointsValue}>{points}</Text>
-              <Text style={styles.pointsLabel}>Total Points</Text>
+              <Text style={styles.pointsLabel}>Points</Text>
             </View>
-            {levelInfo.level < 10 && (
-              <View style={styles.nextLevelInfo}>
-                <Text style={styles.nextLevelText}>
-                  Next: Level {levelInfo.level + 1}
-                </Text>
-                <Text style={styles.nextLevelPoints}>
-                  {levelInfo.maxPoints - points + 1} points to go
-                </Text>
-              </View>
-            )}
+            <View style={styles.pointsDivider} />
+            <View style={styles.pointsInfo}>
+              <Ionicons name="flame" size={28} color={colors.streak.fire} />
+              <Text style={styles.pointsValue}>{currentStreak}</Text>
+              <Text style={styles.pointsLabel}>Day Streak</Text>
+            </View>
           </View>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${progress}%` }]} />
+          {nextMilestone && (
+            <View style={styles.milestoneInfo}>
+              <Text style={styles.milestoneText}>
+                {nextMilestone - currentStreak} days to {nextMilestone}-day badge!
+              </Text>
+            </View>
+          )}
+        </Card>
+
+        {/* Streak Protection */}
+        <Card style={styles.protectionCard}>
+          <View style={styles.protectionHeader}>
+            <View style={styles.protectionIcon}>
+              <Ionicons name="shield-checkmark" size={24} color={colors.primary[500]} />
+            </View>
+            <View style={styles.protectionInfo}>
+              <Text style={styles.protectionTitle}>Streak Protection</Text>
+              <Text style={styles.protectionSubtitle}>
+                Missed a day? Protect your streak!
+              </Text>
+            </View>
           </View>
+          <Button
+            title={`Use ${STREAK_PROTECTION_COST} Points`}
+            variant={canProtect ? 'primary' : 'outline'}
+            size="sm"
+            onPress={handleStreakProtection}
+            disabled={!canProtect}
+          />
         </Card>
 
         {/* Stats Grid */}
@@ -138,14 +173,14 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Completed</Text>
           </Card>
           <Card style={styles.statItem}>
-            <Ionicons name="flame" size={24} color={colors.streak.fire} />
-            <Text style={styles.statValue}>{currentStreak}</Text>
-            <Text style={styles.statLabel}>Current Streak</Text>
-          </Card>
-          <Card style={styles.statItem}>
             <Ionicons name="trophy" size={24} color={colors.warning[500]} />
             <Text style={styles.statValue}>{longestStreak}</Text>
             <Text style={styles.statLabel}>Best Streak</Text>
+          </Card>
+          <Card style={styles.statItem}>
+            <Ionicons name="ribbon" size={24} color={colors.primary[500]} />
+            <Text style={styles.statValue}>{earnedCount}</Text>
+            <Text style={styles.statLabel}>Badges</Text>
           </Card>
         </View>
 
@@ -233,16 +268,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing[4],
+    paddingBottom: spacing[8],
   },
 
   // Header
   header: {
     alignItems: 'center',
     marginBottom: spacing[6],
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: spacing[3],
   },
   avatar: {
     width: 80,
@@ -251,74 +283,86 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[100],
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  levelBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.background.secondary,
-  },
-  levelBadgeText: {
-    ...typography.styles.caption,
-    color: colors.text.inverse,
-    fontWeight: '700',
+    marginBottom: spacing[3],
   },
   displayName: {
     ...typography.styles.h3,
     color: colors.text.primary,
   },
-  levelTitle: {
-    ...typography.styles.body,
+  email: {
+    ...typography.styles.bodySmall,
     color: colors.text.secondary,
     marginTop: spacing[0.5],
   },
 
-  // Progress Card
-  progressCard: {
+  // Points Card
+  pointsCard: {
     marginBottom: spacing[4],
   },
   pointsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing[3],
+    alignItems: 'center',
   },
-  pointsInfo: {},
+  pointsInfo: {
+    flex: 1,
+    alignItems: 'center',
+  },
   pointsValue: {
     ...typography.styles.h2,
     color: colors.text.primary,
+    marginTop: spacing[1],
   },
   pointsLabel: {
     ...typography.styles.caption,
     color: colors.text.secondary,
   },
-  nextLevelInfo: {
-    alignItems: 'flex-end',
+  pointsDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: colors.border.light,
   },
-  nextLevelText: {
+  milestoneInfo: {
+    marginTop: spacing[4],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    alignItems: 'center',
+  },
+  milestoneText: {
     ...typography.styles.bodySmall,
-    color: colors.text.secondary,
+    color: colors.primary[600],
+    fontWeight: '500',
   },
-  nextLevelPoints: {
+
+  // Protection Card
+  protectionCard: {
+    marginBottom: spacing[4],
+  },
+  protectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
+  protectionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  protectionInfo: {
+    flex: 1,
+    marginLeft: spacing[3],
+  },
+  protectionTitle: {
+    ...typography.styles.body,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  protectionSubtitle: {
     ...typography.styles.caption,
-    color: colors.text.tertiary,
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: colors.neutral[200],
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: colors.primary[500],
-    borderRadius: 4,
+    color: colors.text.secondary,
   },
 
   // Stats Grid

@@ -48,15 +48,18 @@ export default function LoginScreen() {
       await login(email.trim(), password);
       router.replace('/(tabs)');
     } catch (error: any) {
+      console.log('Login error code:', error.code);
       let message = 'An error occurred. Please try again.';
       if (error.code === 'auth/user-not-found') {
         message = 'No account found with this email.';
-      } else if (error.code === 'auth/wrong-password') {
-        message = 'Incorrect password.';
+      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        message = 'Incorrect email or password.';
       } else if (error.code === 'auth/invalid-email') {
         message = 'Invalid email address.';
       } else if (error.code === 'auth/too-many-requests') {
         message = 'Too many attempts. Please try again later.';
+      } else if (error.code === 'auth/network-request-failed') {
+        message = 'Network error. Please check your connection.';
       }
       Alert.alert('Login Failed', message);
     }

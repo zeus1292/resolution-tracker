@@ -35,7 +35,7 @@ export function ResolutionForm({
 }: ResolutionFormProps) {
   const [title, setTitle] = useState(initialValues?.title || '');
   const [description, setDescription] = useState(initialValues?.description || '');
-  const [themeId, setThemeId] = useState<ThemeId>(initialValues?.themeId || 'personal');
+  const [themeId, setThemeId] = useState<ThemeId>(initialValues?.themeId || 'health');
   const [deadlineType, setDeadlineType] = useState<DeadlineType>(
     initialValues?.deadlineType || 'daily'
   );
@@ -222,9 +222,9 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   themeItem: {
-    width: '23%',
+    width: '31%',
     alignItems: 'center',
-    padding: spacing[2],
+    padding: spacing[3],
     borderRadius: borderRadius.default,
     borderWidth: 2,
     borderColor: 'transparent',

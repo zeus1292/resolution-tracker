@@ -35,8 +35,7 @@ service cloud.firestore {
       return data.keys().hasAll(['title', 'themeId', 'deadlineType', 'isActive']) &&
              data.title is string &&
              data.title.size() > 0 &&
-             data.themeId in ['health', 'finance', 'career', 'personal',
-                              'relationships', 'education', 'creativity', 'mindfulness'] &&
+             data.themeId in ['health', 'finance', 'career', 'learning', 'creativity', 'travel'] &&
              data.deadlineType in ['daily', 'weekly', 'monthly', 'quarterly', 'custom'];
     }
 

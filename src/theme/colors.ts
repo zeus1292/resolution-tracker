@@ -116,11 +116,9 @@ export const colors = {
     health: '#EF4444',
     finance: '#10B981',
     career: '#3B82F6',
-    personal: '#8B5CF6',
-    relationships: '#EC4899',
-    education: '#F59E0B',
-    creativity: '#06B6D4',
-    mindfulness: '#6366F1',
+    learning: '#F59E0B',
+    creativity: '#8B5CF6',
+    travel: '#06B6D4',
   },
 
   // Streak colors

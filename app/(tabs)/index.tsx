@@ -14,7 +14,7 @@ import { useResolutions } from '../../src/hooks/useResolutions';
 import { Card } from '../../src/components/common';
 import { ResolutionCard } from '../../src/components/resolutions';
 import { resolutionService } from '../../src/services/resolution.service';
-import { getLevelFromPoints } from '../../src/config/gamification';
+import { getNextStreakMilestone } from '../../src/config/gamification';
 import { colors, typography, spacing } from '../../src/theme';
 
 export default function HomeScreen() {
@@ -27,8 +27,8 @@ export default function HomeScreen() {
   const displayName = user?.displayName?.split(' ')[0] || 'there';
   const currentStreak = user?.currentStreak || 0;
   const points = user?.points || 0;
-  const level = user?.level || 1;
-  const levelInfo = getLevelFromPoints(points);
+  const totalCompletions = user?.totalCompletions || 0;
+  const nextMilestone = getNextStreakMilestone(currentStreak);
 
   // Get today's resolutions (daily goals)
   const todaysResolutions = resolutions.filter(
@@ -128,21 +128,33 @@ export default function HomeScreen() {
           </Card>
 
           <Card style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: colors.success[50] }]}>
-              <Ionicons name="star" size={24} color={colors.success[500]} />
+            <View style={[styles.statIconContainer, { backgroundColor: colors.warning[50] }]}>
+              <Ionicons name="star" size={24} color={colors.warning[500]} />
             </View>
             <Text style={styles.statValue}>{points}</Text>
             <Text style={styles.statLabel}>Points</Text>
           </Card>
 
           <Card style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: levelInfo.color + '20' }]}>
-              <Ionicons name="trophy" size={24} color={levelInfo.color} />
+            <View style={[styles.statIconContainer, { backgroundColor: colors.success[50] }]}>
+              <Ionicons name="checkmark-circle" size={24} color={colors.success[500]} />
             </View>
-            <Text style={styles.statValue}>{level}</Text>
-            <Text style={styles.statLabel}>{levelInfo.title}</Text>
+            <Text style={styles.statValue}>{totalCompletions}</Text>
+            <Text style={styles.statLabel}>Completed</Text>
           </Card>
         </View>
+
+        {/* Streak Progress */}
+        {nextMilestone && currentStreak > 0 && (
+          <Card style={styles.streakCard}>
+            <View style={styles.streakInfo}>
+              <Ionicons name="flame" size={20} color={colors.streak.fire} />
+              <Text style={styles.streakText}>
+                {nextMilestone - currentStreak} days to {nextMilestone}-day badge!
+              </Text>
+            </View>
+          </Card>
+        )}
 
         {/* Today's Goals Section */}
         <View style={styles.section}>
@@ -224,7 +236,22 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: spacing[3],
+    marginBottom: spacing[3],
+  },
+  streakCard: {
     marginBottom: spacing[6],
+    paddingVertical: spacing[3],
+  },
+  streakInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
+  },
+  streakText: {
+    ...typography.styles.bodySmall,
+    color: colors.streak.fire,
+    fontWeight: '500',
   },
   statCard: {
     flex: 1,

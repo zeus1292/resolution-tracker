@@ -24,10 +24,18 @@ export function useResolutions() {
     }
 
     setIsLoading(true);
+    setError(null);
+
     const unsubscribe = resolutionService.subscribeToResolutions(
       user.id,
       (newResolutions) => {
         setResolutions(newResolutions);
+        setIsLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('Failed to load resolutions:', err);
+        setError('Failed to load goals. Please check your connection.');
         setIsLoading(false);
       }
     );

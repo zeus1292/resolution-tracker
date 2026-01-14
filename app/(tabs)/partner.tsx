@@ -15,7 +15,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { usePartner } from '../../src/hooks/usePartner';
 import { Card, Button, LoadingSpinner } from '../../src/components/common';
 import { colors, typography, spacing } from '../../src/theme';
-import { getLevelFromPoints } from '../../src/config/gamification';
+import { getNextStreakMilestone } from '../../src/config/gamification';
 
 export default function PartnerScreen() {
   const { user, refreshUser } = useAuth();
@@ -172,7 +172,6 @@ export default function PartnerScreen() {
   }
 
   // Partner connected - show partner view
-  const partnerLevel = partnerInfo ? getLevelFromPoints(partnerInfo.points) : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -195,7 +194,7 @@ export default function PartnerScreen() {
               <View style={styles.partnerInfo}>
                 <Text style={styles.partnerName}>{partnerInfo.displayName}</Text>
                 <Text style={styles.partnerStats}>
-                  Level {partnerInfo.level} • {partnerInfo.points} points
+                  {partnerInfo.points} points • {partnerInfo.currentStreak} day streak
                 </Text>
               </View>
             </View>
@@ -210,18 +209,18 @@ export default function PartnerScreen() {
                 <Text style={styles.partnerStatLabel}>Streak</Text>
               </View>
               <View style={styles.partnerStat}>
+                <View style={[styles.partnerStatIcon, { backgroundColor: colors.warning[50] }]}>
+                  <Ionicons name="star" size={16} color={colors.warning[500]} />
+                </View>
+                <Text style={styles.partnerStatValue}>{partnerInfo.points}</Text>
+                <Text style={styles.partnerStatLabel}>Points</Text>
+              </View>
+              <View style={styles.partnerStat}>
                 <View style={[styles.partnerStatIcon, { backgroundColor: colors.success[50] }]}>
                   <Ionicons name="checkmark-circle" size={16} color={colors.success[500]} />
                 </View>
                 <Text style={styles.partnerStatValue}>{partnerInfo.totalCompletions}</Text>
                 <Text style={styles.partnerStatLabel}>Done</Text>
-              </View>
-              <View style={styles.partnerStat}>
-                <View style={[styles.partnerStatIcon, { backgroundColor: (partnerLevel?.color || colors.primary[500]) + '20' }]}>
-                  <Ionicons name="trophy" size={16} color={partnerLevel?.color || colors.primary[500]} />
-                </View>
-                <Text style={styles.partnerStatValue}>{partnerLevel?.title || 'N/A'}</Text>
-                <Text style={styles.partnerStatLabel}>Rank</Text>
               </View>
             </View>
           </Card>

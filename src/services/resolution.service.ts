@@ -134,7 +134,8 @@ export const resolutionService = {
    */
   subscribeToResolutions(
     userId: string,
-    callback: (resolutions: Resolution[]) => void
+    callback: (resolutions: Resolution[]) => void,
+    onError?: (error: Error) => void
   ): () => void {
     const resolutionsRef = this.getResolutionsRef(userId);
     const q = query(
@@ -143,12 +144,23 @@ export const resolutionService = {
       orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(q, (snapshot) => {
-      const resolutions = snapshot.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() } as Resolution)
-      );
-      callback(resolutions);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const resolutions = snapshot.docs.map(
+          (doc) => ({ id: doc.id, ...doc.data() } as Resolution)
+        );
+        callback(resolutions);
+      },
+      (error) => {
+        console.error('Error fetching resolutions:', error);
+        if (onError) {
+          onError(error as Error);
+        }
+        // Return empty array on error
+        callback([]);
+      }
+    );
   },
 
   /**

@@ -69,23 +69,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      await authService.login(email, password);
+      const fbUser = await authService.login(email, password);
+      // Immediately load user document after login
+      await loadUserDocument(fbUser);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadUserDocument]);
 
   // Register
   const register = useCallback(
     async (email: string, password: string, displayName: string) => {
       setIsLoading(true);
       try {
-        await authService.register(email, password, displayName);
+        const fbUser = await authService.register(email, password, displayName);
+        // Immediately load user document after registration
+        await loadUserDocument(fbUser);
+      } catch (error) {
+        console.error('Registration error:', error);
+        throw error;
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [loadUserDocument]
   );
 
   // Logout
