@@ -19,6 +19,16 @@ interface ResolutionCardProps {
   onPress?: () => void;
 }
 
+// Fallback theme for old/unknown theme IDs
+const FALLBACK_THEME = {
+  id: 'unknown',
+  name: 'General',
+  icon: 'flag',
+  color: '#6366F1',
+  description: 'General goal',
+  sortOrder: 99,
+};
+
 export function ResolutionCard({
   resolution,
   isCompleted,
@@ -27,7 +37,7 @@ export function ResolutionCard({
 }: ResolutionCardProps) {
   const [isToggling, setIsToggling] = useState(false);
   const [localCompleted, setLocalCompleted] = useState(isCompleted);
-  const theme = getTheme(resolution.themeId);
+  const theme = getTheme(resolution.themeId) || FALLBACK_THEME;
 
   useEffect(() => {
     setLocalCompleted(isCompleted);

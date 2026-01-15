@@ -56,6 +56,6 @@ export const THEME_LIST = Object.values(RESOLUTION_THEMES).sort(
   (a, b) => a.sortOrder - b.sortOrder
 );
 
-export function getTheme(themeId: ThemeId): Theme {
+export function getTheme(themeId: ThemeId): Theme | undefined {
   return RESOLUTION_THEMES[themeId];
 }

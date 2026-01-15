@@ -34,8 +34,8 @@ export function useResolutions() {
         setError(null);
       },
       (err) => {
-        console.error('Failed to load resolutions:', err);
-        setError('Failed to load goals. Please check your connection.');
+        console.error('Failed to load resolutions:', err.message, err.code);
+        setError(`Failed to load goals: ${err.message}`);
         setIsLoading(false);
       }
     );
