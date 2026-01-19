@@ -13,16 +13,53 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useResolutions } from '../../src/hooks/useResolutions';
 import { Card } from '../../src/components/common';
 import { ResolutionCard } from '../../src/components/resolutions';
+import { OnboardingScreen } from '../../src/components/onboarding';
 import { resolutionService } from '../../src/services/resolution.service';
+import { authService } from '../../src/services/auth.service';
 import { getNextStreakMilestone } from '../../src/config/gamification';
 import { colors, typography, spacing } from '../../src/theme';
 
 export default function HomeScreen() {
   const { user, refreshUser } = useAuth();
-  const { resolutions, completeResolution, uncompleteResolution } = useResolutions();
+  const { resolutions, createResolution, completeResolution, uncompleteResolution } = useResolutions();
 
   const [refreshing, setRefreshing] = useState(false);
   const [completionStatus, setCompletionStatus] = useState<Record<string, boolean>>({});
+
+  // Check if user needs onboarding
+  // Skip onboarding if user already has resolutions (existing user before onboarding feature)
+  const needsOnboarding = user &&
+    user.onboardingComplete === false &&
+    resolutions.length < 2;
+
+  const handleCompleteOnboarding = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      await authService.completeOnboarding(user.id);
+      await refreshUser();
+    } catch (error) {
+      console.error('Failed to complete onboarding:', error);
+    }
+  }, [user?.id, refreshUser]);
+
+  // Auto-complete onboarding for existing users with resolutions
+  useEffect(() => {
+    if (user && user.onboardingComplete === false && resolutions.length >= 2) {
+      handleCompleteOnboarding();
+    }
+  }, [user, resolutions.length, handleCompleteOnboarding]);
+
+  // Show onboarding for first-time users
+  if (needsOnboarding) {
+    return (
+      <OnboardingScreen
+        displayName={user?.displayName?.split(' ')[0] || 'there'}
+        resolutions={resolutions}
+        onCreateResolution={createResolution}
+        onComplete={handleCompleteOnboarding}
+      />
+    );
+  }
 
   const displayName = user?.displayName?.split(' ')[0] || 'there';
   const currentStreak = user?.currentStreak || 0;

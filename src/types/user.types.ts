@@ -27,6 +27,9 @@ export interface User {
 
   // Push token for Expo notifications
   expoPushToken: string | null;
+
+  // Onboarding status
+  onboardingComplete: boolean;
 }
 
 export type PartnerStatus = 'none' | 'pending_sent' | 'pending_received' | 'active';

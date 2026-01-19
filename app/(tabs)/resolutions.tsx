@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,15 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, LoadingSpinner } from '../../src/components/common';
-import { ResolutionCard } from '../../src/components/resolutions';
+import { ResolutionCard, ThemeGroup } from '../../src/components/resolutions';
 import { useResolutions } from '../../src/hooks/useResolutions';
 import { colors, typography, spacing } from '../../src/theme';
-import { THEME_LIST } from '../../src/config/themes';
+import { THEME_LIST, getTheme } from '../../src/config/themes';
 import { ThemeId, Resolution } from '../../src/types';
 import { resolutionService } from '../../src/services/resolution.service';
 import { useAuth } from '../../src/contexts/AuthContext';
 
-type FilterType = 'all' | ThemeId;
+type ViewMode = 'grouped' | 'list';
 
 export default function ResolutionsScreen() {
   const { user } = useAuth();
@@ -30,7 +30,7 @@ export default function ResolutionsScreen() {
     uncompleteResolution,
   } = useResolutions();
 
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grouped');
   const [refreshing, setRefreshing] = useState(false);
   const [completionStatus, setCompletionStatus] = useState<Record<string, boolean>>({});
 
@@ -59,10 +59,35 @@ export default function ResolutionsScreen() {
     checkCompletions();
   }, [user?.id, resolutions]);
 
-  const filteredResolutions = resolutions.filter((r) => {
-    if (filter === 'all') return true;
-    return r.themeId === filter;
-  });
+  // Group resolutions by theme
+  const groupedResolutions = useMemo(() => {
+    const groups: Record<ThemeId, Resolution[]> = {} as Record<ThemeId, Resolution[]>;
+
+    // Initialize empty arrays for each theme
+    THEME_LIST.forEach((theme) => {
+      groups[theme.id] = [];
+    });
+
+    // Group resolutions
+    resolutions.forEach((resolution) => {
+      const themeId = resolution.themeId;
+      if (groups[themeId]) {
+        groups[themeId].push(resolution);
+      } else {
+        // Fallback for unknown themes - add to first theme
+        if (THEME_LIST.length > 0) {
+          groups[THEME_LIST[0].id].push(resolution);
+        }
+      }
+    });
+
+    return groups;
+  }, [resolutions]);
+
+  // Get themes that have resolutions
+  const activeThemes = useMemo(() => {
+    return THEME_LIST.filter((theme) => groupedResolutions[theme.id]?.length > 0);
+  }, [groupedResolutions]);
 
   const handleAddResolution = () => {
     router.push('/(modals)/resolution-form');
@@ -91,6 +116,22 @@ export default function ResolutionsScreen() {
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
+  const renderResolutionCard = useCallback(
+    (
+      resolution: Resolution,
+      isCompleted: boolean,
+      onToggle: (resolutionId: string, isCompleted: boolean) => Promise<void>
+    ) => (
+      <ResolutionCard
+        key={resolution.id}
+        resolution={resolution}
+        isCompleted={isCompleted}
+        onToggleComplete={onToggle}
+      />
+    ),
+    []
+  );
+
   if (isLoading) {
     return <LoadingSpinner fullScreen message="Loading goals..." />;
   }
@@ -107,69 +148,57 @@ export default function ResolutionsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>My Goals</Text>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddResolution}>
-            <Ionicons name="add" size={24} color={colors.text.inverse} />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {/* View Mode Toggle */}
+            {resolutions.length > 0 && (
+              <TouchableOpacity
+                style={styles.viewToggle}
+                onPress={() => setViewMode(viewMode === 'grouped' ? 'list' : 'grouped')}
+              >
+                <Ionicons
+                  name={viewMode === 'grouped' ? 'list' : 'layers'}
+                  size={20}
+                  color={colors.text.secondary}
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.addButton} onPress={handleAddResolution}>
+              <Ionicons name="add" size={24} color={colors.text.inverse} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
-        >
-          <TouchableOpacity
-            style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
-            onPress={() => setFilter('all')}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                filter === 'all' && styles.filterChipTextActive,
-              ]}
-            >
-              All ({resolutions.length})
-            </Text>
-          </TouchableOpacity>
-          {THEME_LIST.map((theme) => {
-            const count = resolutions.filter((r) => r.themeId === theme.id).length;
-            if (count === 0) return null;
-            return (
-              <TouchableOpacity
-                key={theme.id}
-                style={[
-                  styles.filterChip,
-                  filter === theme.id && styles.filterChipActive,
-                ]}
-                onPress={() => setFilter(theme.id)}
-              >
-                <View
-                  style={[styles.filterDot, { backgroundColor: theme.color }]}
-                />
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    filter === theme.id && styles.filterChipTextActive,
-                  ]}
-                >
-                  {theme.name.split(' ')[0]} ({count})
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        {/* Stats Summary */}
+        {resolutions.length > 0 && (
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{resolutions.length}</Text>
+              <Text style={styles.statLabel}>Total Goals</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{activeThemes.length}</Text>
+              <Text style={styles.statLabel}>Categories</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.success[600] }]}>
+                {Object.values(completionStatus).filter(Boolean).length}
+              </Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+          </View>
+        )}
 
         {/* Resolution List or Empty State */}
-        {filteredResolutions.length === 0 ? (
+        {resolutions.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Ionicons
               name="flag-outline"
               size={64}
               color={colors.neutral[300]}
             />
-            <Text style={styles.emptyTitle}>
-              {filter === 'all' ? 'No goals yet' : 'No goals in this category'}
-            </Text>
+            <Text style={styles.emptyTitle}>No goals yet</Text>
             <Text style={styles.emptySubtitle}>
               Tap the + button to add your first goal and start tracking your progress!
             </Text>
@@ -178,9 +207,25 @@ export default function ResolutionsScreen() {
               <Text style={styles.emptyButtonText}>Add Goal</Text>
             </TouchableOpacity>
           </Card>
+        ) : viewMode === 'grouped' ? (
+          /* Grouped View */
+          <View style={styles.groupedList}>
+            {activeThemes.map((theme, index) => (
+              <ThemeGroup
+                key={theme.id}
+                theme={theme}
+                resolutions={groupedResolutions[theme.id]}
+                completionStatus={completionStatus}
+                onToggleComplete={handleToggleComplete}
+                renderResolutionCard={renderResolutionCard}
+                defaultExpanded={index === 0} // Only first group expanded by default
+              />
+            ))}
+          </View>
         ) : (
+          /* List View */
           <View style={styles.list}>
-            {filteredResolutions.map((resolution) => (
+            {resolutions.map((resolution) => (
               <ResolutionCard
                 key={resolution.id}
                 resolution={resolution}
@@ -214,6 +259,21 @@ const styles = StyleSheet.create({
     ...typography.styles.h2,
     color: colors.text.primary,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  viewToggle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
   addButton: {
     width: 44,
     height: 44,
@@ -222,36 +282,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterContainer: {
-    paddingBottom: spacing[4],
-  },
-  filterChip: {
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[3],
-    borderRadius: 20,
     backgroundColor: colors.background.primary,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    marginRight: spacing[2],
+    borderRadius: 12,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    alignItems: 'center',
   },
-  filterChipActive: {
-    backgroundColor: colors.primary[500],
-    borderColor: colors.primary[500],
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
   },
-  filterChipText: {
-    ...typography.styles.bodySmall,
-    color: colors.text.secondary,
+  statValue: {
+    ...typography.styles.h3,
+    color: colors.text.primary,
   },
-  filterChipTextActive: {
-    color: colors.text.inverse,
+  statLabel: {
+    ...typography.styles.caption,
+    color: colors.text.tertiary,
+    marginTop: spacing[0.5],
   },
-  filterDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: spacing[1.5],
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: colors.border.light,
+  },
+  groupedList: {
+    marginTop: spacing[2],
   },
   list: {
     marginTop: spacing[2],

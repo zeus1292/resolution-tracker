@@ -14,6 +14,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -78,6 +79,7 @@ export const authService = {
         achievements: true,
       },
       expoPushToken: null,
+      onboardingComplete: false,
     };
 
     await setDoc(userRef, userData);
@@ -175,5 +177,16 @@ export const authService = {
     const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
     if (!userDoc.exists()) return null;
     return { id: userDoc.id, ...userDoc.data() } as User;
+  },
+
+  /**
+   * Mark onboarding as complete
+   */
+  async completeOnboarding(uid: string): Promise<void> {
+    const userRef = doc(db, COLLECTIONS.USERS, uid);
+    await updateDoc(userRef, {
+      onboardingComplete: true,
+      updatedAt: serverTimestamp(),
+    });
   },
 };
